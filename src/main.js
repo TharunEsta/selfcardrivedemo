@@ -8,6 +8,7 @@ const STORAGE_KEYS = {
 };
 
 const DEFAULT_ADMIN_PASSWORD = 'Phani@123';
+const DEFAULT_ADMIN_USERNAME = 'admin';
 
 const vehicles = [
   {
@@ -87,9 +88,7 @@ function loadVisitor() {
 
 function loadAdminAuth() {
   return loadJson(STORAGE_KEYS.adminAuth, {
-    registered: false,
-    name: '',
-    username: 'admin',
+    username: DEFAULT_ADMIN_USERNAME,
     password: DEFAULT_ADMIN_PASSWORD,
     faceIdEnabled: false,
     faceIdCredentialId: ''
@@ -117,13 +116,7 @@ const state = {
   showAdminAuth: false,
   isAdminAuthenticated: false,
   adminAuth: loadAdminAuth(),
-  adminForm: {
-    name: '',
-    username: 'admin',
-    password: DEFAULT_ADMIN_PASSWORD,
-    confirmPassword: DEFAULT_ADMIN_PASSWORD
-  },
-  adminLoginUsername: '',
+  adminLoginUsername: DEFAULT_ADMIN_USERNAME,
   adminLoginPassword: '',
   adminMessage: ''
 };
@@ -673,60 +666,32 @@ function render() {
           <div class="auth-overlay">
             <section class="auth-card">
               <p class="eyebrow">Protected Admin Desk</p>
-              <h2>${state.adminAuth.registered ? 'Admin login required' : 'Admin registration required'}</h2>
+              <h2>Admin login required</h2>
               <p class="booking-note">
-                ${state.adminAuth.registered
-                  ? 'Enter the admin password first. On supported iPhones, you can also unlock with Face ID after setup.'
-                  : 'Register the admin account first, then optionally enable Face ID for iPhone access.'}
+                Enter the admin username and password first. On supported iPhones, you can also unlock with Face ID after setup.
               </p>
               ${state.adminMessage ? `<div class="availability-banner"><span>${escapeHtml(state.adminMessage)}</span></div>` : ''}
 
+              <form id="admin-login-form" class="form-grid">
+                <label class="full-width">
+                  <span>Admin username</span>
+                  <input name="username" type="text" placeholder="Enter admin username" value="${escapeHtml(state.adminLoginUsername)}" required />
+                </label>
+                <label class="full-width">
+                  <span>Admin password</span>
+                  <input name="password" type="password" placeholder="Enter admin password" value="${escapeHtml(state.adminLoginPassword)}" required />
+                </label>
+                <button class="primary-button full-width" type="submit">Unlock admin desk</button>
+              </form>
               ${
-                state.adminAuth.registered
-                  ? `
-                    <form id="admin-login-form" class="form-grid">
-                      <label class="full-width">
-                        <span>Admin username</span>
-                        <input name="username" type="text" placeholder="Enter admin username" value="${escapeHtml(state.adminLoginUsername)}" required />
-                      </label>
-                      <label class="full-width">
-                        <span>Admin password</span>
-                        <input name="password" type="password" placeholder="Enter admin password" value="${escapeHtml(state.adminLoginPassword)}" required />
-                      </label>
-                      <button class="primary-button full-width" type="submit">Unlock admin desk</button>
-                    </form>
-                    ${
-                      state.adminAuth.faceIdEnabled && isFaceIdSupported()
-                        ? '<button class="admin-close auth-faceid" data-action="faceid-login" type="button">Unlock with Face ID</button>'
-                        : ''
-                    }
-                    ${
-                      !state.adminAuth.faceIdEnabled && isFaceIdSupported()
-                        ? '<button class="admin-close auth-faceid" data-action="faceid-register" type="button">Add Face ID</button>'
-                        : ''
-                    }
-                  `
-                  : `
-                    <form id="admin-register-form" class="form-grid">
-                      <label class="full-width">
-                        <span>Admin name</span>
-                        <input name="name" type="text" placeholder="Admin name" value="${escapeHtml(state.adminForm.name)}" required />
-                      </label>
-                      <label class="full-width">
-                        <span>Admin username</span>
-                        <input name="username" type="text" placeholder="Admin username" value="${escapeHtml(state.adminForm.username)}" required />
-                      </label>
-                      <label>
-                        <span>Password</span>
-                        <input name="password" type="password" value="${escapeHtml(state.adminForm.password)}" required />
-                      </label>
-                      <label>
-                        <span>Confirm password</span>
-                        <input name="confirmPassword" type="password" value="${escapeHtml(state.adminForm.confirmPassword)}" required />
-                      </label>
-                      <button class="primary-button full-width" type="submit">Register admin</button>
-                    </form>
-                  `
+                state.adminAuth.faceIdEnabled && isFaceIdSupported()
+                  ? '<button class="admin-close auth-faceid" data-action="faceid-login" type="button">Unlock with Face ID</button>'
+                  : ''
+              }
+              ${
+                !state.adminAuth.faceIdEnabled && isFaceIdSupported()
+                  ? '<button class="admin-close auth-faceid" data-action="faceid-register" type="button">Add Face ID</button>'
+                  : ''
               }
 
               <button class="admin-close full-width" data-action="close-auth" type="button">Close</button>
@@ -811,18 +776,9 @@ function attachEvents() {
     if (state.isAdminAuthenticated) {
       state.showAdminDrawer = true;
       state.showAdminAuth = false;
-    } else if (state.adminAuth.registered) {
-      state.showAdminAuth = true;
-      state.showAdminDrawer = false;
     } else {
       state.showAdminAuth = true;
       state.showAdminDrawer = false;
-      state.adminForm = {
-        name: state.adminForm.name,
-        username: state.adminForm.username || 'admin',
-        password: DEFAULT_ADMIN_PASSWORD,
-        confirmPassword: DEFAULT_ADMIN_PASSWORD
-      };
     }
     render();
   });
@@ -857,7 +813,7 @@ function attachEvents() {
     state.showAdminDrawer = false;
     state.showAdminAuth = false;
     state.showSqlExport = false;
-    state.adminLoginUsername = '';
+    state.adminLoginUsername = DEFAULT_ADMIN_USERNAME;
     state.adminLoginPassword = '';
     state.adminMessage = '';
     render();
@@ -944,57 +900,6 @@ function attachEvents() {
     render();
   });
 
-  document.querySelector('#admin-register-form')?.addEventListener('input', (event) => {
-    const form = new FormData(event.currentTarget);
-    state.adminForm = {
-      name: String(form.get('name') || ''),
-      username: String(form.get('username') || ''),
-      password: String(form.get('password') || ''),
-      confirmPassword: String(form.get('confirmPassword') || '')
-    };
-  });
-
-  document.querySelector('#admin-register-form')?.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const name = String(form.get('name') || '').trim();
-    const username = String(form.get('username') || '').trim();
-    const password = String(form.get('password') || '');
-    const confirmPassword = String(form.get('confirmPassword') || '');
-
-    if (!name) {
-      state.adminMessage = 'Enter an admin name.';
-      render();
-      return;
-    }
-
-    if (!username) {
-      state.adminMessage = 'Enter an admin username.';
-      render();
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      state.adminMessage = 'Passwords do not match.';
-      render();
-      return;
-    }
-
-    state.adminAuth = {
-      ...state.adminAuth,
-      registered: true,
-      name,
-      username,
-      password
-    };
-    state.isAdminAuthenticated = false;
-    state.adminLoginUsername = '';
-    state.adminLoginPassword = '';
-    state.adminMessage = 'Admin registered. You can now log in and add Face ID.';
-    persistState();
-    render();
-  });
-
   document.querySelector('#admin-login-form')?.addEventListener('input', (event) => {
     const form = new FormData(event.currentTarget);
     state.adminLoginUsername = String(form.get('username') || '');
@@ -1024,7 +929,7 @@ function attachEvents() {
     state.showAdminDrawer = true;
     state.showSqlExport = false;
     state.adminMessage = '';
-    state.adminLoginUsername = '';
+    state.adminLoginUsername = DEFAULT_ADMIN_USERNAME;
     state.adminLoginPassword = '';
     render();
   });
