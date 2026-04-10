@@ -1,0 +1,354 @@
+:root {
+  color-scheme: dark;
+  --bg: #050608;
+  --panel: rgba(16, 20, 26, 0.84);
+  --panel-strong: rgba(11, 14, 18, 0.96);
+  --stroke: rgba(255, 255, 255, 0.09);
+  --text: #f5f7fb;
+  --muted: #98a6bb;
+  --success: #1d9d63;
+  --danger: #db5866;
+  --warning: #d4a556;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Manrope", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top left, rgba(105, 128, 177, 0.2), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(170, 64, 64, 0.15), transparent 26%),
+    linear-gradient(135deg, #030405, #0b0f14 52%, #06080c);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+.page-shell {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  min-height: 100vh;
+}
+
+.hero-panel,
+.booking-panel {
+  padding: 32px;
+}
+
+.hero-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.hero-topbar,
+.booking-header,
+.step-header,
+.admin-header,
+.admin-item-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  color: #93a8cb;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 0;
+  max-width: 12ch;
+  font-size: clamp(2.4rem, 5vw, 5.4rem);
+  line-height: 0.98;
+}
+
+.video-stage,
+.flow-card,
+.success-card,
+.admin-drawer {
+  border: 1px solid var(--stroke);
+  background: var(--panel);
+  backdrop-filter: blur(24px);
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.35);
+}
+
+.video-stage {
+  position: relative;
+  overflow: hidden;
+  border-radius: 34px;
+  min-height: 530px;
+}
+
+.hero-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  background: #000;
+}
+
+.video-overlay {
+  position: absolute;
+  left: 28px;
+  right: 28px;
+  bottom: 118px;
+  max-width: 470px;
+  padding: 22px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(5, 7, 9, 0.14), rgba(5, 7, 9, 0.78));
+}
+
+.video-overlay h2 {
+  margin-bottom: 8px;
+  font-size: clamp(1.6rem, 2.5vw, 2.4rem);
+}
+
+.video-overlay p,
+.booking-note,
+.step-header p,
+.hero-card span,
+.selection-summary span,
+.availability-banner span,
+.empty-state {
+  color: var(--muted);
+}
+
+.video-pills {
+  position: absolute;
+  left: 28px;
+  right: 28px;
+  bottom: 28px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.video-pill,
+.admin-link,
+.admin-close,
+.primary-button {
+  border: 0;
+  cursor: pointer;
+}
+
+.video-pill,
+.admin-link,
+.admin-close {
+  padding: 16px 18px;
+  border-radius: 20px;
+  color: var(--text);
+  background: rgba(8, 10, 14, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.video-pill {
+  text-align: left;
+}
+
+.video-pill.active {
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.video-pill span,
+.selection-summary strong {
+  display: block;
+}
+
+.video-pill small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+}
+
+.hero-copy {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.hero-card,
+.selection-summary {
+  padding: 20px;
+  border-radius: 24px;
+  border: 1px solid var(--stroke);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.hero-card strong,
+.selection-summary strong {
+  font-size: 1.02rem;
+  line-height: 1.5;
+}
+
+.booking-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  background: linear-gradient(180deg, rgba(9, 12, 16, 0.9), rgba(6, 8, 12, 0.8));
+  border-left: 1px solid var(--stroke);
+}
+
+.flow-card,
+.success-card {
+  border-radius: 28px;
+  padding: 24px;
+}
+
+.disabled-card {
+  opacity: 0.62;
+}
+
+.step-number {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.06));
+  font-weight: 800;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+label {
+  display: grid;
+  gap: 10px;
+}
+
+label span {
+  font-size: 0.94rem;
+  color: #d7deea;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+  outline: none;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.full-width {
+  grid-column: 1 / -1;
+}
+
+.primary-button {
+  padding: 15px 18px;
+  border-radius: 18px;
+  color: #05100a;
+  font-weight: 800;
+  background: linear-gradient(135deg, #dfe9f4, #9db8d9);
+}
+
+.availability-banner {
+  margin-top: 18px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+  display: grid;
+  gap: 4px;
+}
+
+.availability-banner.free {
+  border-color: rgba(29, 157, 99, 0.4);
+  background: rgba(29, 157, 99, 0.1);
+}
+
+.availability-banner.busy {
+  border-color: rgba(219, 88, 102, 0.4);
+  background: rgba(219, 88, 102, 0.1);
+}
+
+.selection-summary {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.success-card {
+  background: linear-gradient(180deg, rgba(24, 78, 54, 0.34), rgba(11, 24, 18, 0.96));
+}
+
+.admin-drawer {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  width: min(460px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  padding: 24px;
+  border-radius: 28px;
+  overflow: auto;
+  background: var(--panel-strong);
+  z-index: 20;
+}
+
+.admin-list {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-item {
+  padding: 18px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.admin-item p {
+  margin-bottom: 8px;
+}
+
+@media (max-width: 1120px) {
+  .page-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-copy,
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .video-pills {
+    grid-template-columns: 1fr;
+  }
+}
