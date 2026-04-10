@@ -3,8 +3,11 @@ import './styles.css';
 const STORAGE_KEYS = {
   visitor: 'premium-self-drive-visitor',
   bookings: 'premium-self-drive-bookings',
-  admin: 'premium-self-drive-admin-queue'
+  admin: 'premium-self-drive-admin-queue',
+  adminAuth: 'premium-self-drive-admin-auth'
 };
+
+const DEFAULT_ADMIN_PASSWORD = 'Phani@123';
 
 const vehicles = [
   {
@@ -53,7 +56,23 @@ const state = {
   selectedFrom: '09:00',
   selectedTo: '12:00',
   selectedLead: null,
-  availabilityChecked: false
+  availabilityChecked: false,
+  detailsDraft: {
+    pickup: '',
+    drop: '',
+    notes: ''
+  },
+  showSqlExport: false,
+  showAdminDrawer: false,
+  showAdminAuth: false,
+  adminAuth: loadAdminAuth(),
+  adminForm: {
+    name: '',
+    password: '',
+    confirmPassword: ''
+  },
+  adminLoginPassword: '',
+  adminMessage: ''
 };
 
 function loadJson(key, fallback) {
@@ -69,12 +88,39 @@ function saveJson(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+const bookingStore = {
+  loadVisitor() {
+    return loadJson(STORAGE_KEYS.visitor, {
+      name: '',
+      email: '',
+      phone: '',
+      loggedIn: false
+    });
+  },
+  loadBookings() {
+    return cleanupBookings(loadJson(STORAGE_KEYS.bookings, []));
+  },
+  loadAdminQueue() {
+    return cleanupBookings(loadJson(STORAGE_KEYS.admin, []));
+  },
+  save(visitor, bookings, adminQueue) {
+    saveJson(STORAGE_KEYS.bookings, bookings);
+    saveJson(STORAGE_KEYS.admin, adminQueue);
+    saveJson(STORAGE_KEYS.visitor, visitor);
+  }
+};
+
 function loadVisitor() {
-  return loadJson(STORAGE_KEYS.visitor, {
+  return bookingStore.loadVisitor();
+}
+
+function loadAdminAuth() {
+  return loadJson(STORAGE_KEYS.adminAuth, {
+    registered: false,
     name: '',
-    email: '',
-    phone: '',
-    loggedIn: false
+    password: DEFAULT_ADMIN_PASSWORD,
+    faceIdEnabled: false,
+    faceIdCredentialId: ''
   });
 }
 
@@ -89,9 +135,8 @@ function cleanupBookings(items) {
 }
 
 function persistState() {
-  saveJson(STORAGE_KEYS.bookings, state.bookings);
-  saveJson(STORAGE_KEYS.admin, state.adminQueue);
-  saveJson(STORAGE_KEYS.visitor, state.visitor);
+  bookingStore.save(state.visitor, state.bookings, state.adminQueue);
+  saveJson(STORAGE_KEYS.adminAuth, state.adminAuth);
 }
 
 function getDateOptions() {
@@ -115,6 +160,15 @@ function formatDate(dateString) {
     month: 'short',
     year: 'numeric'
   }).format(new Date(dateString));
+}
+
+function formatShortDate(dateString) {
+  const date = new Date(dateString);
+  return {
+    weekday: new Intl.DateTimeFormat('en-IN', { weekday: 'short' }).format(date),
+    day: new Intl.DateTimeFormat('en-IN', { day: '2-digit' }).format(date),
+    month: new Intl.DateTimeFormat('en-IN', { month: 'short' }).format(date)
+  };
 }
 
 function formatTime(value) {
@@ -180,6 +234,114 @@ function escapeHtml(value) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
+}
+
+function escapeSql(value) {
+  return String(value ?? '').replaceAll("'", "''");
+}
+
+function isFaceIdSupported() {
+  return (
+    typeof window.PublicKeyCredential !== 'undefined' &&
+    typeof navigator.credentials !== 'undefined' &&
+    typeof navigator.credentials.create === 'function' &&
+    typeof navigator.credentials.get === 'function'
+  );
+}
+
+function toBase64Url(buffer) {
+  return btoa(String.fromCharCode(...new Uint8Array(buffer)))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replaceAll('=', '');
+}
+
+function randomBuffer(size = 32) {
+  const buffer = new Uint8Array(size);
+  crypto.getRandomValues(buffer);
+  return buffer;
+}
+
+async function registerFaceId() {
+  const userId = randomBuffer(16);
+  const challenge = randomBuffer(32);
+
+  const credential = await navigator.credentials.create({
+    publicKey: {
+      challenge,
+      rp: { name: 'Self Drive Admin Desk' },
+      user: {
+        id: userId,
+        name: state.adminAuth.name || 'admin@selfdrive.local',
+        displayName: state.adminAuth.name || 'Admin'
+      },
+      pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
+      authenticatorSelection: {
+        authenticatorAttachment: 'platform',
+        residentKey: 'preferred',
+        userVerification: 'required'
+      },
+      timeout: 60000,
+      attestation: 'none'
+    }
+  });
+
+  const rawId = credential?.rawId ? toBase64Url(credential.rawId) : '';
+  if (!rawId) {
+    throw new Error('Face ID registration failed.');
+  }
+
+  state.adminAuth.faceIdEnabled = true;
+  state.adminAuth.faceIdCredentialId = rawId;
+  persistState();
+}
+
+async function loginWithFaceId() {
+  const challenge = randomBuffer(32);
+  await navigator.credentials.get({
+    publicKey: {
+      challenge,
+      userVerification: 'required',
+      timeout: 60000
+    }
+  });
+
+  state.showAdminAuth = false;
+  state.showAdminDrawer = true;
+  state.adminMessage = 'Face ID verified.';
+  render();
+}
+
+function buildSqlExport(rows) {
+  if (!rows.length) {
+    return '-- No active booking leads to export.';
+  }
+
+  return [
+    '-- Booking lead export',
+    ...rows.map(
+      (lead) => `INSERT INTO booking_leads (
+  id, vehicle_id, vehicle_name, booking_date, time_from, time_to,
+  customer_name, customer_email, customer_phone, pickup_location,
+  drop_location, trip_notes, created_at, status
+) VALUES (
+  '${escapeSql(lead.id)}',
+  '${escapeSql(lead.vehicle)}',
+  '${escapeSql(lead.vehicleName)}',
+  '${escapeSql(lead.date)}',
+  '${escapeSql(lead.from)}',
+  '${escapeSql(lead.to)}',
+  '${escapeSql(lead.name)}',
+  '${escapeSql(lead.email)}',
+  '${escapeSql(lead.phone)}',
+  '${escapeSql(lead.pickup)}',
+  '${escapeSql(lead.drop)}',
+  '${escapeSql(lead.notes || '')}',
+  '${escapeSql(lead.createdAt)}',
+  '${escapeSql(lead.status)}'
+);`
+    )
+  ].join('\n\n');
 }
 
 function render() {
@@ -292,63 +454,99 @@ function render() {
             </div>
           </div>
           <form id="availability-form" class="form-grid">
-            <label class="full-width">
-              <span>Vehicle</span>
-              <select name="vehicle" ${state.visitor.loggedIn ? '' : 'disabled'}>
+            <input name="vehicle" type="hidden" value="${state.selectedVehicle}" />
+            <input name="date" type="hidden" value="${state.selectedDate}" />
+            <input name="from" type="hidden" value="${state.selectedFrom}" />
+            <input name="to" type="hidden" value="${state.selectedTo}" />
+
+            <div class="picker-group full-width">
+              <span class="picker-label">Vehicle</span>
+              <div class="choice-grid two-up">
                 ${vehicles
                   .map(
                     (vehicle) => `
-                      <option value="${vehicle.id}" ${vehicle.id === state.selectedVehicle ? 'selected' : ''}>
-                        ${vehicle.name}
-                      </option>
+                      <button
+                        class="choice-pill ${vehicle.id === state.selectedVehicle ? 'active' : ''}"
+                        data-action="pick-vehicle"
+                        data-vehicle="${vehicle.id}"
+                        type="button"
+                        ${state.visitor.loggedIn ? '' : 'disabled'}
+                      >
+                        <strong>${vehicle.name}</strong>
+                        <small>${vehicle.tag}</small>
+                      </button>
                     `
                   )
                   .join('')}
-              </select>
-            </label>
-            <label>
-              <span>Date</span>
-              <select name="date" ${state.visitor.loggedIn ? '' : 'disabled'}>
-                <option value="">Choose date</option>
+              </div>
+            </div>
+
+            <div class="picker-group full-width">
+              <span class="picker-label">Date</span>
+              <div class="calendar-grid">
                 ${dateOptions
-                  .map(
-                    (date) => `
-                      <option value="${date}" ${date === state.selectedDate ? 'selected' : ''}>
-                        ${formatDate(date)}
-                      </option>
-                    `
-                  )
+                  .map((date) => {
+                    const parts = formatShortDate(date);
+                    return `
+                      <button
+                        class="date-card ${date === state.selectedDate ? 'active' : ''}"
+                        data-action="pick-date"
+                        data-date="${date}"
+                        type="button"
+                        ${state.visitor.loggedIn ? '' : 'disabled'}
+                      >
+                        <small>${parts.weekday}</small>
+                        <strong>${parts.day}</strong>
+                        <span>${parts.month}</span>
+                      </button>
+                    `;
+                  })
                   .join('')}
-              </select>
-            </label>
-            <label>
-              <span>From</span>
-              <select name="from" ${state.visitor.loggedIn ? '' : 'disabled'}>
+              </div>
+            </div>
+
+            <div class="picker-group">
+              <span class="picker-label">From</span>
+              <div class="choice-grid">
                 ${timeSlots
                   .map(
                     (slot) => `
-                      <option value="${slot}" ${slot === state.selectedFrom ? 'selected' : ''}>
+                      <button
+                        class="time-pill ${slot === state.selectedFrom ? 'active' : ''}"
+                        data-action="pick-from"
+                        data-time="${slot}"
+                        type="button"
+                        ${state.visitor.loggedIn ? '' : 'disabled'}
+                      >
                         ${formatTime(slot)}
-                      </option>
+                      </button>
                     `
                   )
                   .join('')}
-              </select>
-            </label>
-            <label>
-              <span>Upto</span>
-              <select name="to" ${state.visitor.loggedIn ? '' : 'disabled'}>
+              </div>
+            </div>
+
+            <div class="picker-group">
+              <span class="picker-label">Upto</span>
+              <div class="choice-grid">
                 ${timeSlots
                   .map(
                     (slot) => `
-                      <option value="${slot}" ${slot === state.selectedTo ? 'selected' : ''}>
+                      <button
+                        class="time-pill ${slot === state.selectedTo ? 'active' : ''}"
+                        data-action="pick-to"
+                        data-time="${slot}"
+                        type="button"
+                        ${state.visitor.loggedIn ? '' : 'disabled'}
+                      >
                         ${formatTime(slot)}
-                      </option>
+                      </button>
                     `
                   )
                   .join('')}
-              </select>
-            </label>
+              </div>
+            </div>
+
             <button class="primary-button full-width" type="submit" ${state.visitor.loggedIn ? '' : 'disabled'}>
               Check availability
             </button>
@@ -378,15 +576,15 @@ function render() {
           <form id="details-form" class="form-grid">
             <label>
               <span>Pickup location</span>
-              <input name="pickup" type="text" placeholder="Pickup area" ${state.visitor.loggedIn && availability.valid && !availability.busy ? '' : 'disabled'} required />
+              <input name="pickup" type="text" placeholder="Pickup area" value="${escapeHtml(state.detailsDraft.pickup)}" ${state.visitor.loggedIn && availability.valid && !availability.busy ? '' : 'disabled'} required />
             </label>
             <label>
               <span>Drop location</span>
-              <input name="drop" type="text" placeholder="Drop area" ${state.visitor.loggedIn && availability.valid && !availability.busy ? '' : 'disabled'} required />
+              <input name="drop" type="text" placeholder="Drop area" value="${escapeHtml(state.detailsDraft.drop)}" ${state.visitor.loggedIn && availability.valid && !availability.busy ? '' : 'disabled'} required />
             </label>
             <label class="full-width">
               <span>Trip notes</span>
-              <textarea name="notes" rows="4" placeholder="Tell the admin anything helpful about your trip." ${state.visitor.loggedIn && availability.valid && !availability.busy ? '' : 'disabled'}></textarea>
+              <textarea name="notes" rows="4" placeholder="Tell the admin anything helpful about your trip." ${state.visitor.loggedIn && availability.valid && !availability.busy ? '' : 'disabled'}>${escapeHtml(state.detailsDraft.notes)}</textarea>
             </label>
             <button class="primary-button full-width" type="submit" ${state.visitor.loggedIn && availability.valid && !availability.busy ? '' : 'disabled'}>
               Submit booking request
@@ -412,14 +610,28 @@ function render() {
       </section>
     </div>
 
-    <aside class="admin-drawer" id="admin-drawer" hidden>
+    <aside class="admin-drawer" id="admin-drawer" ${state.showAdminDrawer ? '' : 'hidden'}>
       <div class="admin-header">
         <div>
           <p class="eyebrow">Admin queue</p>
           <h2>New booking follow-ups</h2>
         </div>
-        <button class="admin-close" data-action="close-admin" type="button">Close</button>
+        <div class="admin-actions">
+          <button class="admin-close" data-action="toggle-sql" type="button">SQL export</button>
+          <button class="admin-close" data-action="close-admin" type="button">Close</button>
+        </div>
       </div>
+      ${
+        state.showSqlExport
+          ? `
+            <div class="sql-panel">
+              <p class="eyebrow">Frontend SQL</p>
+              <p class="booking-note">This app still runs in the browser, but you can copy these SQL statements into any SQL database later.</p>
+              <textarea class="sql-output" readonly>${escapeHtml(buildSqlExport(state.adminQueue))}</textarea>
+            </div>
+          `
+          : ''
+      }
       <div class="admin-list">
         ${
           state.adminQueue.length
@@ -447,6 +659,67 @@ function render() {
         }
       </div>
     </aside>
+
+    ${
+      state.showAdminAuth
+        ? `
+          <div class="auth-overlay">
+            <section class="auth-card">
+              <p class="eyebrow">Protected Admin Desk</p>
+              <h2>${state.adminAuth.registered ? 'Admin login required' : 'Admin registration required'}</h2>
+              <p class="booking-note">
+                ${state.adminAuth.registered
+                  ? 'Enter the admin password first. On supported iPhones, you can also unlock with Face ID after setup.'
+                  : 'Register the admin account first, then optionally enable Face ID for iPhone access.'}
+              </p>
+              ${state.adminMessage ? `<div class="availability-banner"><span>${escapeHtml(state.adminMessage)}</span></div>` : ''}
+
+              ${
+                state.adminAuth.registered
+                  ? `
+                    <form id="admin-login-form" class="form-grid">
+                      <label class="full-width">
+                        <span>Admin password</span>
+                        <input name="password" type="password" placeholder="Enter admin password" value="${escapeHtml(state.adminLoginPassword)}" required />
+                      </label>
+                      <button class="primary-button full-width" type="submit">Unlock admin desk</button>
+                    </form>
+                    ${
+                      state.adminAuth.faceIdEnabled && isFaceIdSupported()
+                        ? '<button class="admin-close auth-faceid" data-action="faceid-login" type="button">Unlock with Face ID</button>'
+                        : ''
+                    }
+                    ${
+                      !state.adminAuth.faceIdEnabled && isFaceIdSupported()
+                        ? '<button class="admin-close auth-faceid" data-action="faceid-register" type="button">Add Face ID</button>'
+                        : ''
+                    }
+                  `
+                  : `
+                    <form id="admin-register-form" class="form-grid">
+                      <label class="full-width">
+                        <span>Admin name</span>
+                        <input name="name" type="text" placeholder="Admin name" value="${escapeHtml(state.adminForm.name)}" required />
+                      </label>
+                      <label>
+                        <span>Password</span>
+                        <input name="password" type="password" value="${escapeHtml(state.adminForm.password || DEFAULT_ADMIN_PASSWORD)}" required />
+                      </label>
+                      <label>
+                        <span>Confirm password</span>
+                        <input name="confirmPassword" type="password" value="${escapeHtml(state.adminForm.confirmPassword || DEFAULT_ADMIN_PASSWORD)}" required />
+                      </label>
+                      <button class="primary-button full-width" type="submit">Register admin</button>
+                    </form>
+                  `
+              }
+
+              <button class="admin-close full-width" data-action="close-auth" type="button">Close</button>
+            </section>
+          </div>
+        `
+        : ''
+    }
   `;
 
   attachEvents();
@@ -458,6 +731,11 @@ function attachEvents() {
     heroVideo.currentTime = 0;
     heroVideo.play().catch(() => {});
     heroVideo.addEventListener('ended', () => {
+      if (document.querySelector('input:focus, select:focus, textarea:focus')) {
+        heroVideo.currentTime = 0;
+        heroVideo.play().catch(() => {});
+        return;
+      }
       state.activeVideo = (state.activeVideo + 1) % vehicles.length;
       render();
     });
@@ -474,14 +752,76 @@ function attachEvents() {
     });
   });
 
+  document.querySelectorAll('[data-action="pick-vehicle"]').forEach((button) => {
+    button.addEventListener('click', () => {
+      state.selectedVehicle = button.dataset.vehicle || vehicles[0].id;
+      const vehicleIndex = vehicles.findIndex((vehicle) => vehicle.id === state.selectedVehicle);
+      state.activeVideo = vehicleIndex >= 0 ? vehicleIndex : 0;
+      state.availabilityChecked = false;
+      state.selectedLead = null;
+      render();
+    });
+  });
+
+  document.querySelectorAll('[data-action="pick-date"]').forEach((button) => {
+    button.addEventListener('click', () => {
+      state.selectedDate = button.dataset.date || '';
+      state.availabilityChecked = false;
+      state.selectedLead = null;
+      render();
+    });
+  });
+
+  document.querySelectorAll('[data-action="pick-from"]').forEach((button) => {
+    button.addEventListener('click', () => {
+      state.selectedFrom = button.dataset.time || '09:00';
+      state.availabilityChecked = false;
+      state.selectedLead = null;
+      render();
+    });
+  });
+
+  document.querySelectorAll('[data-action="pick-to"]').forEach((button) => {
+    button.addEventListener('click', () => {
+      state.selectedTo = button.dataset.time || '12:00';
+      state.availabilityChecked = false;
+      state.selectedLead = null;
+      render();
+    });
+  });
+
   document.querySelector('[data-action="toggle-admin"]')?.addEventListener('click', () => {
-    document.querySelector('#admin-drawer')?.removeAttribute('hidden');
-    document.body.classList.add('admin-open');
+    state.adminMessage = '';
+    if (state.adminAuth.registered) {
+      state.showAdminAuth = true;
+      state.showAdminDrawer = false;
+    } else {
+      state.showAdminAuth = true;
+      state.showAdminDrawer = false;
+      state.adminForm = {
+        name: state.adminForm.name,
+        password: DEFAULT_ADMIN_PASSWORD,
+        confirmPassword: DEFAULT_ADMIN_PASSWORD
+      };
+    }
+    render();
+  });
+
+  document.querySelector('[data-action="toggle-sql"]')?.addEventListener('click', () => {
+    state.showSqlExport = !state.showSqlExport;
+    state.showAdminDrawer = true;
+    render();
   });
 
   document.querySelector('[data-action="close-admin"]')?.addEventListener('click', () => {
-    document.querySelector('#admin-drawer')?.setAttribute('hidden', 'hidden');
-    document.body.classList.remove('admin-open');
+    state.showAdminDrawer = false;
+    render();
+  });
+
+  document.querySelector('[data-action="close-auth"]')?.addEventListener('click', () => {
+    state.showAdminAuth = false;
+    state.adminMessage = '';
+    render();
   });
 
   document.querySelector('#login-form')?.addEventListener('submit', (event) => {
@@ -498,31 +838,32 @@ function attachEvents() {
     render();
   });
 
-  document.querySelector('#availability-form')?.addEventListener('change', (event) => {
+  document.querySelector('#login-form')?.addEventListener('input', (event) => {
     const form = new FormData(event.currentTarget);
-    state.selectedVehicle = String(form.get('vehicle') || vehicles[0].id);
-    state.selectedDate = String(form.get('date') || '');
-    state.selectedFrom = String(form.get('from') || '09:00');
-    state.selectedTo = String(form.get('to') || '12:00');
-    const vehicleIndex = vehicles.findIndex((vehicle) => vehicle.id === state.selectedVehicle);
-    state.activeVideo = vehicleIndex >= 0 ? vehicleIndex : 0;
-    state.availabilityChecked = false;
-    state.selectedLead = null;
-    render();
+    state.visitor = {
+      ...state.visitor,
+      name: String(form.get('name') || '').trim(),
+      email: String(form.get('email') || '').trim(),
+      phone: String(form.get('phone') || '').trim()
+    };
   });
 
   document.querySelector('#availability-form')?.addEventListener('submit', (event) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    state.selectedVehicle = String(form.get('vehicle') || vehicles[0].id);
-    state.selectedDate = String(form.get('date') || '');
-    state.selectedFrom = String(form.get('from') || '09:00');
-    state.selectedTo = String(form.get('to') || '12:00');
     const vehicleIndex = vehicles.findIndex((vehicle) => vehicle.id === state.selectedVehicle);
     state.activeVideo = vehicleIndex >= 0 ? vehicleIndex : 0;
     state.availabilityChecked = true;
     state.selectedLead = null;
     render();
+  });
+
+  document.querySelector('#details-form')?.addEventListener('input', (event) => {
+    const form = new FormData(event.currentTarget);
+    state.detailsDraft = {
+      pickup: String(form.get('pickup') || ''),
+      drop: String(form.get('drop') || ''),
+      notes: String(form.get('notes') || '')
+    };
   });
 
   document.querySelector('#details-form')?.addEventListener('submit', (event) => {
@@ -555,8 +896,96 @@ function attachEvents() {
     state.bookings.push(lead);
     state.adminQueue.push(lead);
     state.selectedLead = lead;
+    state.detailsDraft = {
+      pickup: '',
+      drop: '',
+      notes: ''
+    };
     persistState();
     render();
+  });
+
+  document.querySelector('#admin-register-form')?.addEventListener('input', (event) => {
+    const form = new FormData(event.currentTarget);
+    state.adminForm = {
+      name: String(form.get('name') || ''),
+      password: String(form.get('password') || ''),
+      confirmPassword: String(form.get('confirmPassword') || '')
+    };
+  });
+
+  document.querySelector('#admin-register-form')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const name = String(form.get('name') || '').trim();
+    const password = String(form.get('password') || '');
+    const confirmPassword = String(form.get('confirmPassword') || '');
+
+    if (!name) {
+      state.adminMessage = 'Enter an admin name.';
+      render();
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      state.adminMessage = 'Passwords do not match.';
+      render();
+      return;
+    }
+
+    state.adminAuth = {
+      ...state.adminAuth,
+      registered: true,
+      name,
+      password
+    };
+    state.adminLoginPassword = '';
+    state.adminMessage = 'Admin registered. You can now log in and add Face ID.';
+    persistState();
+    render();
+  });
+
+  document.querySelector('#admin-login-form')?.addEventListener('input', (event) => {
+    const form = new FormData(event.currentTarget);
+    state.adminLoginPassword = String(form.get('password') || '');
+  });
+
+  document.querySelector('#admin-login-form')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const password = String(form.get('password') || '');
+
+    if (password !== state.adminAuth.password) {
+      state.adminMessage = 'Incorrect admin password.';
+      render();
+      return;
+    }
+
+    state.showAdminAuth = false;
+    state.showAdminDrawer = true;
+    state.adminMessage = '';
+    state.adminLoginPassword = '';
+    render();
+  });
+
+  document.querySelector('[data-action="faceid-register"]')?.addEventListener('click', async () => {
+    try {
+      await registerFaceId();
+      state.adminMessage = 'Face ID added for this device.';
+      render();
+    } catch (error) {
+      state.adminMessage = error instanceof Error ? error.message : 'Face ID setup failed.';
+      render();
+    }
+  });
+
+  document.querySelector('[data-action="faceid-login"]')?.addEventListener('click', async () => {
+    try {
+      await loginWithFaceId();
+    } catch (error) {
+      state.adminMessage = error instanceof Error ? error.message : 'Face ID login failed.';
+      render();
+    }
   });
 }
 

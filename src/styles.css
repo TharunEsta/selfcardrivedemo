@@ -241,6 +241,106 @@ h1 {
   gap: 16px;
 }
 
+.picker-group {
+  display: grid;
+  gap: 12px;
+}
+
+.picker-label {
+  font-size: 0.94rem;
+  color: #d7deea;
+}
+
+.choice-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.choice-grid.two-up {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.choice-pill,
+.time-pill,
+.date-card {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+  transition: border-color 160ms ease, transform 160ms ease, background 160ms ease;
+}
+
+.choice-pill:hover,
+.time-pill:hover,
+.date-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.choice-pill:disabled,
+.time-pill:disabled,
+.date-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.choice-pill.active,
+.time-pill.active,
+.date-card.active {
+  border-color: rgba(157, 184, 217, 0.9);
+  background: rgba(126, 153, 190, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.choice-pill {
+  padding: 16px;
+  border-radius: 18px;
+  text-align: left;
+}
+
+.choice-pill strong,
+.choice-pill small {
+  display: block;
+}
+
+.choice-pill small {
+  margin-top: 6px;
+  color: var(--muted);
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  max-height: 290px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.date-card {
+  padding: 14px 10px;
+  border-radius: 18px;
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+}
+
+.date-card small,
+.date-card span {
+  color: var(--muted);
+}
+
+.date-card strong {
+  font-size: 1.2rem;
+}
+
+.time-pill {
+  padding: 12px 14px;
+  border-radius: 999px;
+}
+
 label {
   display: grid;
   gap: 10px;
@@ -322,9 +422,54 @@ textarea {
   z-index: 20;
 }
 
+.auth-overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(2, 4, 8, 0.72);
+  backdrop-filter: blur(14px);
+  z-index: 30;
+}
+
+.auth-card {
+  width: min(560px, 100%);
+  padding: 28px;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(12, 15, 20, 0.96);
+  box-shadow: 0 32px 72px rgba(0, 0, 0, 0.42);
+}
+
+.auth-faceid {
+  width: 100%;
+  margin: 14px 0 0;
+}
+
 .admin-list {
   display: grid;
   gap: 14px;
+}
+
+.admin-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.sql-panel {
+  margin-bottom: 16px;
+  padding: 16px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sql-output {
+  min-height: 220px;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.82rem;
+  line-height: 1.5;
 }
 
 .admin-item {
@@ -344,11 +489,22 @@ textarea {
   }
 
   .hero-copy,
-  .form-grid {
+  .form-grid,
+  .choice-grid.two-up {
     grid-template-columns: 1fr;
   }
 
   .video-pills {
     grid-template-columns: 1fr;
+  }
+
+  .calendar-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .calendar-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
