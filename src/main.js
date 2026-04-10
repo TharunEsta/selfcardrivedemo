@@ -90,6 +90,7 @@ function loadAdminAuth() {
   return loadJson(STORAGE_KEYS.adminAuth, {
     username: DEFAULT_ADMIN_USERNAME,
     password: DEFAULT_ADMIN_PASSWORD,
+    biometricReady: false,
     faceIdEnabled: false,
     faceIdCredentialId: ''
   });
@@ -289,6 +290,7 @@ async function registerFaceId() {
   }
 
   state.adminAuth.faceIdEnabled = true;
+  state.adminAuth.biometricReady = true;
   state.adminAuth.faceIdCredentialId = rawId;
   persistState();
 }
@@ -616,6 +618,11 @@ function render() {
           <h2>New booking follow-ups</h2>
         </div>
         <div class="admin-actions">
+          ${
+            !state.adminAuth.faceIdEnabled && state.isAdminAuthenticated && isFaceIdSupported()
+              ? '<button class="admin-close" data-action="faceid-register" type="button">Add Face ID</button>'
+              : ''
+          }
           <button class="admin-close" data-action="toggle-sql" type="button">${state.showSqlExport ? 'Hide SQL' : 'SQL export'}</button>
           <button class="admin-close" data-action="logout-admin" type="button">Logout</button>
           <button class="admin-close" data-action="close-admin" type="button">Close</button>
@@ -684,13 +691,8 @@ function render() {
                 <button class="primary-button full-width" type="submit">Unlock admin desk</button>
               </form>
               ${
-                state.adminAuth.faceIdEnabled && isFaceIdSupported()
+                state.adminAuth.faceIdEnabled && state.adminAuth.biometricReady && isFaceIdSupported()
                   ? '<button class="admin-close auth-faceid" data-action="faceid-login" type="button">Unlock with Face ID</button>'
-                  : ''
-              }
-              ${
-                !state.adminAuth.faceIdEnabled && isFaceIdSupported()
-                  ? '<button class="admin-close auth-faceid" data-action="faceid-register" type="button">Add Face ID</button>'
                   : ''
               }
 
@@ -925,19 +927,21 @@ function attachEvents() {
     }
 
     state.isAdminAuthenticated = true;
+    state.adminAuth.biometricReady = true;
     state.showAdminAuth = false;
     state.showAdminDrawer = true;
     state.showSqlExport = false;
     state.adminMessage = '';
     state.adminLoginUsername = DEFAULT_ADMIN_USERNAME;
     state.adminLoginPassword = '';
+    persistState();
     render();
   });
 
   document.querySelector('[data-action="faceid-register"]')?.addEventListener('click', async () => {
     try {
       await registerFaceId();
-      state.adminMessage = 'Face ID added for this device.';
+      state.adminMessage = 'Face ID or fingerprint added for future admin logins on this device.';
       render();
     } catch (error) {
       state.adminMessage = error instanceof Error ? error.message : 'Face ID setup failed.';
