@@ -356,7 +356,11 @@ function render() {
         <div class="hero-topbar">
           <div>
             <p class="eyebrow">Premium Self Drive</p>
-            <h1>Luxury booking flow with cinematic vehicle previews.</h1>
+            ${
+              state.isAdminAuthenticated
+                ? '<h1 class="admin-hero-title">Admin Dashboard</h1>'
+                : ''
+            }
           </div>
           <button class="admin-link" data-action="toggle-admin" type="button">Admin desk</button>
         </div>
