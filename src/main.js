@@ -65,11 +65,12 @@ const state = {
   showSqlExport: false,
   showAdminDrawer: false,
   showAdminAuth: false,
+  isAdminAuthenticated: false,
   adminAuth: loadAdminAuth(),
   adminForm: {
     name: '',
-    password: '',
-    confirmPassword: ''
+    password: DEFAULT_ADMIN_PASSWORD,
+    confirmPassword: DEFAULT_ADMIN_PASSWORD
   },
   adminLoginPassword: '',
   adminMessage: ''
@@ -306,8 +307,10 @@ async function loginWithFaceId() {
     }
   });
 
+  state.isAdminAuthenticated = true;
   state.showAdminAuth = false;
   state.showAdminDrawer = true;
+  state.showSqlExport = false;
   state.adminMessage = 'Face ID verified.';
   render();
 }
@@ -610,14 +613,15 @@ function render() {
       </section>
     </div>
 
-    <aside class="admin-drawer" id="admin-drawer" ${state.showAdminDrawer ? '' : 'hidden'}>
+    <aside class="admin-drawer" id="admin-drawer" ${state.showAdminDrawer && state.isAdminAuthenticated ? '' : 'hidden'}>
       <div class="admin-header">
         <div>
           <p class="eyebrow">Admin queue</p>
           <h2>New booking follow-ups</h2>
         </div>
         <div class="admin-actions">
-          <button class="admin-close" data-action="toggle-sql" type="button">SQL export</button>
+          <button class="admin-close" data-action="toggle-sql" type="button">${state.showSqlExport ? 'Hide SQL' : 'SQL export'}</button>
+          <button class="admin-close" data-action="logout-admin" type="button">Logout</button>
           <button class="admin-close" data-action="close-admin" type="button">Close</button>
         </div>
       </div>
@@ -703,11 +707,11 @@ function render() {
                       </label>
                       <label>
                         <span>Password</span>
-                        <input name="password" type="password" value="${escapeHtml(state.adminForm.password || DEFAULT_ADMIN_PASSWORD)}" required />
+                        <input name="password" type="password" value="${escapeHtml(state.adminForm.password)}" required />
                       </label>
                       <label>
                         <span>Confirm password</span>
-                        <input name="confirmPassword" type="password" value="${escapeHtml(state.adminForm.confirmPassword || DEFAULT_ADMIN_PASSWORD)}" required />
+                        <input name="confirmPassword" type="password" value="${escapeHtml(state.adminForm.confirmPassword)}" required />
                       </label>
                       <button class="primary-button full-width" type="submit">Register admin</button>
                     </form>
@@ -792,7 +796,11 @@ function attachEvents() {
 
   document.querySelector('[data-action="toggle-admin"]')?.addEventListener('click', () => {
     state.adminMessage = '';
-    if (state.adminAuth.registered) {
+    state.showSqlExport = false;
+    if (state.isAdminAuthenticated) {
+      state.showAdminDrawer = true;
+      state.showAdminAuth = false;
+    } else if (state.adminAuth.registered) {
       state.showAdminAuth = true;
       state.showAdminDrawer = false;
     } else {
@@ -808,6 +816,13 @@ function attachEvents() {
   });
 
   document.querySelector('[data-action="toggle-sql"]')?.addEventListener('click', () => {
+    if (!state.isAdminAuthenticated) {
+      state.showAdminAuth = true;
+      state.showAdminDrawer = false;
+      state.adminMessage = 'Admin login required.';
+      render();
+      return;
+    }
     state.showSqlExport = !state.showSqlExport;
     state.showAdminDrawer = true;
     render();
@@ -815,11 +830,22 @@ function attachEvents() {
 
   document.querySelector('[data-action="close-admin"]')?.addEventListener('click', () => {
     state.showAdminDrawer = false;
+    state.showSqlExport = false;
     render();
   });
 
   document.querySelector('[data-action="close-auth"]')?.addEventListener('click', () => {
     state.showAdminAuth = false;
+    state.adminMessage = '';
+    render();
+  });
+
+  document.querySelector('[data-action="logout-admin"]')?.addEventListener('click', () => {
+    state.isAdminAuthenticated = false;
+    state.showAdminDrawer = false;
+    state.showAdminAuth = false;
+    state.showSqlExport = false;
+    state.adminLoginPassword = '';
     state.adminMessage = '';
     render();
   });
@@ -939,6 +965,7 @@ function attachEvents() {
       name,
       password
     };
+    state.isAdminAuthenticated = false;
     state.adminLoginPassword = '';
     state.adminMessage = 'Admin registered. You can now log in and add Face ID.';
     persistState();
@@ -961,8 +988,10 @@ function attachEvents() {
       return;
     }
 
+    state.isAdminAuthenticated = true;
     state.showAdminAuth = false;
     state.showAdminDrawer = true;
+    state.showSqlExport = false;
     state.adminMessage = '';
     state.adminLoginPassword = '';
     render();
