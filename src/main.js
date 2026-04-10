@@ -46,36 +46,6 @@ const timeSlots = [
   '22:00'
 ];
 
-const state = {
-  activeVideo: 0,
-  visitor: loadVisitor(),
-  bookings: cleanupBookings(loadJson(STORAGE_KEYS.bookings, [])),
-  adminQueue: cleanupBookings(loadJson(STORAGE_KEYS.admin, [])),
-  selectedVehicle: vehicles[0].id,
-  selectedDate: '',
-  selectedFrom: '09:00',
-  selectedTo: '12:00',
-  selectedLead: null,
-  availabilityChecked: false,
-  detailsDraft: {
-    pickup: '',
-    drop: '',
-    notes: ''
-  },
-  showSqlExport: false,
-  showAdminDrawer: false,
-  showAdminAuth: false,
-  isAdminAuthenticated: false,
-  adminAuth: loadAdminAuth(),
-  adminForm: {
-    name: '',
-    password: DEFAULT_ADMIN_PASSWORD,
-    confirmPassword: DEFAULT_ADMIN_PASSWORD
-  },
-  adminLoginPassword: '',
-  adminMessage: ''
-};
-
 function loadJson(key, fallback) {
   try {
     const raw = localStorage.getItem(key);
@@ -119,11 +89,44 @@ function loadAdminAuth() {
   return loadJson(STORAGE_KEYS.adminAuth, {
     registered: false,
     name: '',
+    username: 'admin',
     password: DEFAULT_ADMIN_PASSWORD,
     faceIdEnabled: false,
     faceIdCredentialId: ''
   });
 }
+
+const state = {
+  activeVideo: 0,
+  visitor: loadVisitor(),
+  bookings: cleanupBookings(loadJson(STORAGE_KEYS.bookings, [])),
+  adminQueue: cleanupBookings(loadJson(STORAGE_KEYS.admin, [])),
+  selectedVehicle: vehicles[0].id,
+  selectedDate: '',
+  selectedFrom: '09:00',
+  selectedTo: '12:00',
+  selectedLead: null,
+  availabilityChecked: false,
+  detailsDraft: {
+    pickup: '',
+    drop: '',
+    notes: ''
+  },
+  showSqlExport: false,
+  showAdminDrawer: false,
+  showAdminAuth: false,
+  isAdminAuthenticated: false,
+  adminAuth: loadAdminAuth(),
+  adminForm: {
+    name: '',
+    username: 'admin',
+    password: DEFAULT_ADMIN_PASSWORD,
+    confirmPassword: DEFAULT_ADMIN_PASSWORD
+  },
+  adminLoginUsername: '',
+  adminLoginPassword: '',
+  adminMessage: ''
+};
 
 function cleanupBookings(items) {
   const today = new Date();
@@ -683,6 +686,10 @@ function render() {
                   ? `
                     <form id="admin-login-form" class="form-grid">
                       <label class="full-width">
+                        <span>Admin username</span>
+                        <input name="username" type="text" placeholder="Enter admin username" value="${escapeHtml(state.adminLoginUsername)}" required />
+                      </label>
+                      <label class="full-width">
                         <span>Admin password</span>
                         <input name="password" type="password" placeholder="Enter admin password" value="${escapeHtml(state.adminLoginPassword)}" required />
                       </label>
@@ -704,6 +711,10 @@ function render() {
                       <label class="full-width">
                         <span>Admin name</span>
                         <input name="name" type="text" placeholder="Admin name" value="${escapeHtml(state.adminForm.name)}" required />
+                      </label>
+                      <label class="full-width">
+                        <span>Admin username</span>
+                        <input name="username" type="text" placeholder="Admin username" value="${escapeHtml(state.adminForm.username)}" required />
                       </label>
                       <label>
                         <span>Password</span>
@@ -808,6 +819,7 @@ function attachEvents() {
       state.showAdminDrawer = false;
       state.adminForm = {
         name: state.adminForm.name,
+        username: state.adminForm.username || 'admin',
         password: DEFAULT_ADMIN_PASSWORD,
         confirmPassword: DEFAULT_ADMIN_PASSWORD
       };
@@ -845,6 +857,7 @@ function attachEvents() {
     state.showAdminDrawer = false;
     state.showAdminAuth = false;
     state.showSqlExport = false;
+    state.adminLoginUsername = '';
     state.adminLoginPassword = '';
     state.adminMessage = '';
     render();
@@ -935,6 +948,7 @@ function attachEvents() {
     const form = new FormData(event.currentTarget);
     state.adminForm = {
       name: String(form.get('name') || ''),
+      username: String(form.get('username') || ''),
       password: String(form.get('password') || ''),
       confirmPassword: String(form.get('confirmPassword') || '')
     };
@@ -944,11 +958,18 @@ function attachEvents() {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const name = String(form.get('name') || '').trim();
+    const username = String(form.get('username') || '').trim();
     const password = String(form.get('password') || '');
     const confirmPassword = String(form.get('confirmPassword') || '');
 
     if (!name) {
       state.adminMessage = 'Enter an admin name.';
+      render();
+      return;
+    }
+
+    if (!username) {
+      state.adminMessage = 'Enter an admin username.';
       render();
       return;
     }
@@ -963,9 +984,11 @@ function attachEvents() {
       ...state.adminAuth,
       registered: true,
       name,
+      username,
       password
     };
     state.isAdminAuthenticated = false;
+    state.adminLoginUsername = '';
     state.adminLoginPassword = '';
     state.adminMessage = 'Admin registered. You can now log in and add Face ID.';
     persistState();
@@ -974,13 +997,21 @@ function attachEvents() {
 
   document.querySelector('#admin-login-form')?.addEventListener('input', (event) => {
     const form = new FormData(event.currentTarget);
+    state.adminLoginUsername = String(form.get('username') || '');
     state.adminLoginPassword = String(form.get('password') || '');
   });
 
   document.querySelector('#admin-login-form')?.addEventListener('submit', (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    const username = String(form.get('username') || '').trim();
     const password = String(form.get('password') || '');
+
+    if (username !== state.adminAuth.username) {
+      state.adminMessage = 'Incorrect admin username.';
+      render();
+      return;
+    }
 
     if (password !== state.adminAuth.password) {
       state.adminMessage = 'Incorrect admin password.';
@@ -993,6 +1024,7 @@ function attachEvents() {
     state.showAdminDrawer = true;
     state.showSqlExport = false;
     state.adminMessage = '';
+    state.adminLoginUsername = '';
     state.adminLoginPassword = '';
     render();
   });
